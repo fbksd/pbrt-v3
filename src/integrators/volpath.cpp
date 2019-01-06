@@ -39,6 +39,7 @@
 #include "paramset.h"
 #include "scene.h"
 #include "stats.h"
+#include <fbksd/renderer/samples.h>
 
 namespace pbrt {
 
@@ -54,11 +55,12 @@ void VolPathIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
 
 Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                                Sampler &sampler, MemoryArena &arena,
-                               int depth) const {
+                               int depth, SampleBuffer* sampleBuffer) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f), beta(1.f);
     RayDifferential ray(r);
     bool specularBounce = false;
+    bool hadNonSpecularBounce = false;
     int bounces;
     // Added after book publication: etaScale tracks the accumulated effect
     // of radiance scaling due to rays passing through refractive
@@ -80,16 +82,42 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         if (beta.IsBlack()) break;
 
         // Handle an interaction with a medium or a surface
+        Spectrum directL;
         if (mi.IsValid()) {
             // Terminate path if ray escaped or _maxDepth_ was reached
             if (bounces >= maxDepth) break;
+
+            if(bounces <= 1)
+            {
+                const Point3f &p = mi.p;
+                const Normal3f &n = mi.n;
+                sampleBuffer->set(WORLD_X, bounces, p.x);
+                sampleBuffer->set(WORLD_Y, bounces, p.y);
+                sampleBuffer->set(WORLD_Z, bounces, p.z);
+                Normal3f nn = Faceforward(n, -ray.d);
+                sampleBuffer->set(NORMAL_X, bounces, nn.x);
+                sampleBuffer->set(NORMAL_Y, bounces, nn.y);
+                sampleBuffer->set(NORMAL_Z, bounces, nn.z);
+
+                Spectrum tex = beta;
+                float rgb[3];
+                tex.ToRGB(rgb);
+                sampleBuffer->set(TEXTURE_COLOR_R, bounces, rgb[0]);
+                sampleBuffer->set(TEXTURE_COLOR_G, bounces, rgb[1]);
+                sampleBuffer->set(TEXTURE_COLOR_B, bounces, rgb[2]);
+            }
+            if(bounces == 0)
+            {
+                // copy the depth value because the benchmark needs it
+                r.tMax = ray.tMax;
+            }
 
             ++volumeInteractions;
             // Handle scattering at point in medium for volumetric path tracer
             const Distribution1D *lightDistrib =
                 lightDistribution->Lookup(mi.p);
-            L += beta * UniformSampleOneLight(mi, scene, arena, sampler, true,
-                                              lightDistrib);
+            L += beta * UniformSampleOneLight(mi, scene, arena, sampler, directL, bounces, sampleBuffer,
+                                              true, lightDistrib);
 
             Vector3f wo = -ray.d, wi;
             mi.phase->Sample_p(wo, &wi, sampler.Get2D());
@@ -120,12 +148,46 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                 continue;
             }
 
+            if(bounces <= 1)
+            {
+                const Point3f &p = isect.p;
+                const Normal3f &n = isect.shading.n;
+                sampleBuffer->set(WORLD_X, bounces, p.x);
+                sampleBuffer->set(WORLD_Y, bounces, p.y);
+                sampleBuffer->set(WORLD_Z, bounces, p.z);
+                Normal3f nn = Faceforward(n, -ray.d);
+                sampleBuffer->set(NORMAL_X, bounces, nn.x);
+                sampleBuffer->set(NORMAL_Y, bounces, nn.y);
+                sampleBuffer->set(NORMAL_Z, bounces, nn.z);
+
+                Spectrum tex = isect.bsdf->getAlbedo();
+                float rgb[3];
+                tex.ToRGB(rgb);
+                sampleBuffer->set(TEXTURE_COLOR_R, bounces, rgb[0]);
+                sampleBuffer->set(TEXTURE_COLOR_G, bounces, rgb[1]);
+                sampleBuffer->set(TEXTURE_COLOR_B, bounces, rgb[2]);
+            }
+            if(bounces == 0)
+            {
+                // copy the depth value because the benchmark needs it
+                r.tMax = ray.tMax;
+            }
+
             // Sample illumination from lights to find attenuated path
             // contribution
             const Distribution1D *lightDistrib =
                 lightDistribution->Lookup(isect.p);
-            L += beta * UniformSampleOneLight(isect, scene, arena, sampler,
+            L += beta * UniformSampleOneLight(isect, scene, arena, sampler, directL, bounces, sampleBuffer,
                                               true, lightDistrib);
+
+            if(bounces == 0)
+            {
+                float rgb[] = {0.f, 0.f, 0.f};
+                directL.ToRGB(rgb);
+                sampleBuffer->set(DIRECT_LIGHT_R, rgb[0]);
+                sampleBuffer->set(DIRECT_LIGHT_G, rgb[1]);
+                sampleBuffer->set(DIRECT_LIGHT_B, rgb[2]);
+            }
 
             // Sample BSDF to get new path direction
             Vector3f wo = -ray.d, wi;
@@ -147,6 +209,26 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             }
             ray = isect.SpawnRay(wi);
 
+            if(!hadNonSpecularBounce && !specularBounce)
+            {
+                hadNonSpecularBounce = true;
+
+                const Point3f &p = isect.p;
+                const Normal3f &n = isect.shading.n;
+                sampleBuffer->set(WORLD_X_NS, p.x);
+                sampleBuffer->set(WORLD_Y_NS, p.y);
+                sampleBuffer->set(WORLD_Z_NS, p.z);
+                Normal3f nn = Faceforward(n, wo);
+                sampleBuffer->set(NORMAL_X_NS, nn.x);
+                sampleBuffer->set(NORMAL_Y_NS, nn.y);
+                sampleBuffer->set(NORMAL_Z_NS, nn.z);
+                float rgb[3];
+                isect.bsdf->getAlbedo().ToRGB(rgb);
+                sampleBuffer->set(TEXTURE_COLOR_R_NS, rgb[0]);
+                sampleBuffer->set(TEXTURE_COLOR_G_NS, rgb[1]);
+                sampleBuffer->set(TEXTURE_COLOR_B_NS, rgb[2]);
+            }
+
             // Account for attenuated subsurface scattering, if applicable
             if (isect.bssrdf && (flags & BSDF_TRANSMISSION)) {
                 // Importance sample the BSSRDF
@@ -160,7 +242,7 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                 // Account for the attenuated direct subsurface scattering
                 // component
                 L += beta *
-                     UniformSampleOneLight(pi, scene, arena, sampler, true,
+                     UniformSampleOneLight(pi, scene, arena, sampler, directL, 0, nullptr, true,
                                            lightDistribution->Lookup(pi.p));
 
                 // Account for the indirect subsurface scattering component

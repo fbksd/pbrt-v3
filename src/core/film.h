@@ -70,6 +70,8 @@ class Film {
     void AddSplat(const Point2f &p, Spectrum v);
     void WriteImage(Float splatScale = 1);
     void Clear();
+    float getScale(){return scale;}
+    float getMaxSampleLuminance(){return maxSampleLuminance;}
 
     // Film Public Data
     const Point2i fullResolution;

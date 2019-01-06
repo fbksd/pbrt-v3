@@ -364,6 +364,10 @@ SET_PROPERTY(TARGET Ptex_static ptxinfo halftest ftest rtest wtest PROPERTY FOLD
 INCLUDE_DIRECTORIES ( src/ext/ptex/src/ptex )
 
 ###########################################################################
+# fbksd
+find_package(fbksd REQUIRED)
+
+###########################################################################
 # On to pbrt...
 
 SET ( PBRT_CORE_SOURCE
@@ -490,6 +494,7 @@ ADD_LIBRARY ( pbrt STATIC
   ${PBRT_SOURCE}
   )
 ADD_SANITIZERS ( pbrt )
+TARGET_LINK_LIBRARIES ( pbrt fbksd::renderer)
 
 # A non-exhaustive but pretty representative set..
 # Note that we work-around shoddy c++11 support in MSVC2013
@@ -574,3 +579,5 @@ INSTALL ( TARGETS
   DESTINATION
   lib
   )
+
+install(FILES info.json DESTINATION .)

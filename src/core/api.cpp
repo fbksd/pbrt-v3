@@ -1677,8 +1677,19 @@ Integrator *RenderOptions::MakeIntegrator() const {
         return nullptr;
     }
 
+    // check if chosen integrator is supported by the Benchmark
+    // if not, use path
+    bool forcePath = false;
+    if(IntegratorName != "path" && IntegratorName != "directlighting" && IntegratorName != "volpath") {
+        Warning("Integrator \"%s\" not supported by fbksd. Setting to \"path\"",
+                IntegratorName.c_str());
+        forcePath = true;
+    }
+
     Integrator *integrator = nullptr;
-    if (IntegratorName == "whitted")
+    if(forcePath)
+        integrator = CreatePathIntegrator(IntegratorParams, sampler, camera);
+    else if (IntegratorName == "whitted")
         integrator = CreateWhittedIntegrator(IntegratorParams, sampler, camera);
     else if (IntegratorName == "directlighting")
         integrator =
@@ -1701,7 +1712,7 @@ Integrator *RenderOptions::MakeIntegrator() const {
     }
 
     if (renderOptions->haveScatteringMedia && IntegratorName != "volpath" &&
-        IntegratorName != "bdpt" && IntegratorName != "mlt") {
+        IntegratorName != "bdpt" && IntegratorName != "mlt" && !forcePath) {
         Warning(
             "Scene has scattering media but \"%s\" integrator doesn't support "
             "volume scattering. Consider using \"volpath\", \"bdpt\", or "

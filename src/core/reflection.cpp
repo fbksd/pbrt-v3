@@ -791,4 +791,13 @@ std::string BSDF::ToString() const {
     return s + std::string(" ]");
 }
 
+Spectrum BSDF::getAlbedo() const
+{
+    Spectrum tex(0.f);
+    for(int i = 0; i < nBxDFs; i++)
+        if(bxdfs[i]->type & (BSDF_DIFFUSE | BSDF_GLOSSY))
+            tex += bxdfs[i]->getAlbedo();
+    return tex;
+}
+
 }  // namespace pbrt

@@ -1,0 +1,4 @@
+{
+    "name": "pbrt-v3",
+    "exec": "bin/pbrt"
+}

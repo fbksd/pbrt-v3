@@ -46,6 +46,14 @@
 #include "reflection.h"
 #include "sampler.h"
 #include "material.h"
+#include <fbksd/renderer/RenderingServer.h>
+using namespace fbksd;
+
+namespace fbksd {
+  class SceneInfo;
+  class CropWindow;
+  class SampleBuffer;
+}
 
 namespace pbrt {
 
@@ -62,13 +70,13 @@ Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
                                 const std::vector<int> &nLightSamples,
                                 bool handleMedia = false);
 Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
-                               MemoryArena &arena, Sampler &sampler,
-                               bool handleMedia = false,
+                               MemoryArena &arena, Sampler &sampler, Spectrum& Li, int bounce,
+                               SampleBuffer* sampleBuffer, bool handleMedia = false,
                                const Distribution1D *lightDistrib = nullptr);
 Spectrum EstimateDirect(const Interaction &it, const Point2f &uShading,
                         const Light &light, const Point2f &uLight,
                         const Scene &scene, Sampler &sampler,
-                        MemoryArena &arena, bool handleMedia = false,
+                        MemoryArena &arena, Spectrum& directL, bool handleMedia = false,
                         bool specular = false);
 std::unique_ptr<Distribution1D> ComputeLightPowerDistribution(
     const Scene &scene);
@@ -85,7 +93,7 @@ class SamplerIntegrator : public Integrator {
     void Render(const Scene &scene);
     virtual Spectrum Li(const RayDifferential &ray, const Scene &scene,
                         Sampler &sampler, MemoryArena &arena,
-                        int depth = 0) const = 0;
+                        int depth = 0, SampleBuffer* sampleBuffer = nullptr) const = 0;
     Spectrum SpecularReflect(const RayDifferential &ray,
                              const SurfaceInteraction &isect,
                              const Scene &scene, Sampler &sampler,
@@ -100,9 +108,17 @@ class SamplerIntegrator : public Integrator {
     std::shared_ptr<const Camera> camera;
 
   private:
+    void getSceneInfo(const Scene& scene, SceneInfo *info);
+    bool evaluateSamples(const Scene& scene, int spp, int remaining);
+
+    void sppRender(const Scene& scene, Sampler* sppSampler, int width, int height, float fs, float ml);
+    void offsetRender(const Scene& scene, Sampler* sppSampler, int width, int height, float fs, float ml);
+    void sparseRender(const Scene& scene, size_t rest, int width, int height, float fs, float ml, size_t offset);
+
     // SamplerIntegrator Private Data
     std::shared_ptr<Sampler> sampler;
     const Bounds2i pixelBounds;
+    SampleLayout m_layout;
 };
 
 }  // namespace pbrt

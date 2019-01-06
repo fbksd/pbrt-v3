@@ -46,6 +46,17 @@ Sampler::Sampler(int64_t samplesPerPixel) : samplesPerPixel(samplesPerPixel) {}
 CameraSample Sampler::GetCameraSample(const Point2i &pRaster) {
     CameraSample cs;
     cs.pFilm = (Point2f)pRaster + Get2D();
+
+    // Check limits to a void sample spilling in another pixel
+    if(((int)cs.pFilm.x) < pRaster.x)
+        cs.pFilm.x = pRaster.x + 0.0001f;
+    if(((int)cs.pFilm.x) > pRaster.x)
+        cs.pFilm.x = (pRaster.x + 1) - 0.0001f;
+    if(((int)cs.pFilm.y) < pRaster.y)
+        cs.pFilm.y = pRaster.y + 0.0001f;
+    if(((int)cs.pFilm.y) > pRaster.y)
+        cs.pFilm.y = (pRaster.y + 1) - 0.0001f;
+
     cs.time = Get1D();
     cs.pLens = Get2D();
     return cs;

@@ -184,6 +184,7 @@ class BSDF {
     Float Pdf(const Vector3f &wo, const Vector3f &wi,
               BxDFType flags = BSDF_ALL) const;
     std::string ToString() const;
+    Spectrum getAlbedo() const;
 
     // BSDF Public Data
     const Float eta;
@@ -224,6 +225,9 @@ class BxDF {
     virtual Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     virtual std::string ToString() const = 0;
 
+    virtual Spectrum getAlbedo() const
+    { return Spectrum(0.f); }
+
     // BxDF Public Data
     const BxDFType type;
 };
@@ -252,6 +256,8 @@ class ScaledBxDF : public BxDF {
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     std::string ToString() const;
 
+    Spectrum getAlbedo() const
+    { return bxdf->getAlbedo() * scale; }
   private:
     BxDF *bxdf;
     Spectrum scale;
@@ -383,6 +389,8 @@ class LambertianReflection : public BxDF {
     Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
     Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
+    Spectrum getAlbedo() const
+    { return R; }
 
   private:
     // LambertianReflection Private Data
@@ -419,6 +427,8 @@ class OrenNayar : public BxDF {
         B = 0.45f * sigma2 / (sigma2 + 0.09f);
     }
     std::string ToString() const;
+    Spectrum getAlbedo() const
+    { return R; }
 
   private:
     // OrenNayar Private Data
@@ -440,6 +450,8 @@ class MicrofacetReflection : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     std::string ToString() const;
+    Spectrum getAlbedo() const
+    { return R; }
 
   private:
     // MicrofacetReflection Private Data
@@ -490,6 +502,8 @@ class FresnelBlend : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     std::string ToString() const;
+    virtual Spectrum getAlbedo() const
+    { return Rd; }
 
   private:
     // FresnelBlend Private Data

@@ -38,6 +38,8 @@
 #include "camera.h"
 #include "film.h"
 #include "stats.h"
+#include <fbksd/renderer/SamplesPipe.h>
+using namespace fbksd;
 
 namespace pbrt {
 
@@ -61,7 +63,8 @@ void DirectLightingIntegrator::Preprocess(const Scene &scene,
 
 Spectrum DirectLightingIntegrator::Li(const RayDifferential &ray,
                                       const Scene &scene, Sampler &sampler,
-                                      MemoryArena &arena, int depth) const {
+                                      MemoryArena &arena, int depth,
+                                      SampleBuffer* sampleBuffer) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f);
     // Find closest ray intersection or return background radiance
@@ -78,14 +81,52 @@ Spectrum DirectLightingIntegrator::Li(const RayDifferential &ray,
     Vector3f wo = isect.wo;
     // Compute emitted light if ray hit an area light source
     L += isect.Le(wo);
+
+    if (depth == 0 && sampleBuffer) {
+        const Point3f &p = isect.p;
+        const Normal3f &n = isect.shading.n;
+        sampleBuffer->set(WORLD_X, p.x);
+        sampleBuffer->set(WORLD_Y, p.y);
+        sampleBuffer->set(WORLD_Z, p.z);
+        sampleBuffer->set(NORMAL_X, n.x);
+        sampleBuffer->set(NORMAL_Y, n.y);
+        sampleBuffer->set(NORMAL_Z, n.z);
+
+        Spectrum tex = isect.bsdf->getAlbedo();
+        float rgb[3];
+        tex.ToRGB(rgb);
+        sampleBuffer->set(TEXTURE_COLOR_R, rgb[0]);
+        sampleBuffer->set(TEXTURE_COLOR_G, rgb[1]);
+        sampleBuffer->set(TEXTURE_COLOR_B, rgb[2]);
+        sampleBuffer->set(WORLD_X_NS, p.x);
+        sampleBuffer->set(WORLD_Y_NS, p.y);
+        sampleBuffer->set(WORLD_Z_NS, p.z);
+        sampleBuffer->set(NORMAL_X_NS, n.x);
+        sampleBuffer->set(NORMAL_Y_NS, n.y);
+        sampleBuffer->set(NORMAL_Z_NS, n.z);
+        sampleBuffer->set(TEXTURE_COLOR_R_NS, rgb[0]);
+        sampleBuffer->set(TEXTURE_COLOR_G_NS, rgb[1]);
+        sampleBuffer->set(TEXTURE_COLOR_B_NS, rgb[2]);
+    }
+
+    Spectrum directL;
     if (scene.lights.size() > 0) {
         // Compute direct lighting for _DirectLightingIntegrator_ integrator
         if (strategy == LightStrategy::UniformSampleAll)
             L += UniformSampleAllLights(isect, scene, arena, sampler,
                                         nLightSamples);
         else
-            L += UniformSampleOneLight(isect, scene, arena, sampler);
+            L += UniformSampleOneLight(isect, scene, arena, sampler, directL, depth, sampleBuffer);
     }
+
+    if (depth == 0 && sampleBuffer) {
+        float rgb[] = {0.f, 0.f, 0.f};
+        directL.ToRGB(rgb);
+        sampleBuffer->set(DIRECT_LIGHT_R, rgb[0]);
+        sampleBuffer->set(DIRECT_LIGHT_G, rgb[1]);
+        sampleBuffer->set(DIRECT_LIGHT_B, rgb[2]);
+    }
+
     if (depth + 1 < maxDepth) {
         // Trace rays for specular reflection and refraction
         L += SpecularReflect(ray, isect, scene, sampler, arena, depth);
