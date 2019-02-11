@@ -109,16 +109,16 @@ class SamplerIntegrator : public Integrator {
 
   private:
     void getSceneInfo(const Scene& scene, SceneInfo *info);
-    bool evaluateSamples(const Scene& scene, int spp, int remaining);
+    void evaluateSamples(const Scene& scene, int spp, int remaining, int pipeSize);
 
-    void sppRender(const Scene& scene, Sampler* sppSampler, int width, int height, float fs, float ml);
-    void offsetRender(const Scene& scene, Sampler* sppSampler, int width, int height, float fs, float ml);
-    void sparseRender(const Scene& scene, size_t rest, int width, int height, float fs, float ml, size_t offset);
+    void sppRender(const Scene& scene, Sampler* sppSampler, int width, int height, float fs, float ml, bool seekByPixel);
+    void sparseRender(const Scene& scene, size_t rest, int width, int height, float fs, float ml, int tileSize);
 
     // SamplerIntegrator Private Data
     std::shared_ptr<Sampler> sampler;
     const Bounds2i pixelBounds;
     SampleLayout m_layout;
+    std::unique_ptr<std::thread> m_thread;
 };
 
 }  // namespace pbrt
