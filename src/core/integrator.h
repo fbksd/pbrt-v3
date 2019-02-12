@@ -48,6 +48,7 @@
 #include "material.h"
 #include <fbksd/renderer/RenderingServer.h>
 using namespace fbksd;
+#include <thread>
 
 namespace fbksd {
   class SceneInfo;
