@@ -64,7 +64,7 @@ void PathIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
 
 Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                             Sampler &sampler, MemoryArena &arena,
-                            int depth, SampleBuffer* sampleBuffer) const {
+                            int depth, SampleBuffer* sampleBuffer, Spectrum* diffuse) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f), beta(1.f);
     RayDifferential ray(r);
@@ -80,6 +80,13 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
     // out of a medium and thus have their beta value increased.
     Float etaScale = 1;
 
+    enum class FirstItsType {
+        NONE,	 // first non-delta intersection not reached yet
+        DIFFUSE, // first non-delta intersection is diffuse
+        GLOSSY,  // //                           is glossy
+    } firstItsType = FirstItsType::NONE;
+    auto roughnessThreshold = m_layout.getRoughnessThreshold();
+
     for (bounces = 0;; ++bounces) {
         // Find next path vertex and accumulate contribution
         VLOG(2) << "Path tracer bounce " << bounces << ", current L = " << L
@@ -93,11 +100,19 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         if (bounces == 0 || specularBounce) {
             // Add emitted light at path vertex or from the environment
             if (foundIntersection) {
-                L += beta * isect.Le(-ray.d);
+                auto Le = isect.Le(-ray.d);
+                L += beta * Le;
                 VLOG(2) << "Added Le -> L = " << L;
+                if(firstItsType == FirstItsType::DIFFUSE)
+                    *diffuse += beta * Le;
             } else {
                 for (const auto &light : scene.infiniteLights)
-                    L += beta * light->Le(ray);
+                {
+                    auto Le = light->Le(ray);
+                    L += beta * Le;
+                    if(firstItsType == FirstItsType::DIFFUSE)
+                        *diffuse += beta * Le;
+                }
                 VLOG(2) << "Added infinite area lights -> L = " << L;
             }
         }
@@ -144,16 +159,21 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         Spectrum directL; // Incident direct lighting
         // Sample illumination from lights to find path contribution.
         // (But skip this for perfectly specular BSDFs.)
+        Spectrum diffComp;
         if (isect.bsdf->NumComponents(BxDFType(BSDF_ALL & ~BSDF_SPECULAR)) >
             0) {
             ++totalPaths;
             Spectrum Ld = beta * UniformSampleOneLight(isect, scene, arena,
-                                                       sampler, directL, bounces, sampleBuffer, false, distrib);
+                                                       sampler, directL, bounces, sampleBuffer, diffComp,
+                                                       roughnessThreshold, false, distrib);
             VLOG(2) << "Sampled direct lighting Ld = " << Ld;
             if (Ld.IsBlack()) ++zeroRadiancePaths;
             CHECK_GE(Ld.y(), 0.f);
             L += Ld;
-
+            if(firstItsType == FirstItsType::DIFFUSE)
+                *diffuse += Ld;
+            else if(firstItsType == FirstItsType::NONE)
+                *diffuse += diffComp * beta;
         }
 
         if(bounces == 0)
@@ -169,8 +189,9 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         Vector3f wo = -ray.d, wi;
         Float pdf;
         BxDFType flags;
+        Float roughness = 0.f;
         Spectrum f = isect.bsdf->Sample_f(wo, &wi, sampler.Get2D(), &pdf,
-                                          BSDF_ALL, &flags);
+                                          BSDF_ALL, &flags, &roughness);
         VLOG(2) << "Sampled BSDF, f = " << f << ", pdf = " << pdf;
         if (f.IsBlack() || pdf == 0.f) break;
         beta *= f * AbsDot(wi, isect.shading.n) / pdf;
@@ -178,6 +199,17 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
         CHECK_GE(beta.y(), 0.f);
         DCHECK(!std::isinf(beta.y()));
         specularBounce = (flags & BSDF_SPECULAR) != 0;
+
+        bool isDelta = (flags & BSDF_SPECULAR) || ((flags & BSDF_GLOSSY) && (roughness < 1e-4f));
+        if(firstItsType == FirstItsType::NONE && !isDelta)
+        {
+            bool isDiffuse = (flags & (BSDF_DIFFUSE | BSDF_GLOSSY)) && roughness >= roughnessThreshold;
+            if(isDiffuse)
+                firstItsType = FirstItsType::DIFFUSE;
+            else
+                firstItsType = FirstItsType::GLOSSY;
+        }
+
         if ((flags & BSDF_SPECULAR) && (flags & BSDF_TRANSMISSION)) {
             Float eta = isect.bsdf->eta;
             // Update the term that tracks radiance scaling for refraction
@@ -218,7 +250,8 @@ Spectrum PathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             beta *= S / pdf;
 
             // Account for the direct subsurface scattering component
-            L += beta * UniformSampleOneLight(pi, scene, arena, sampler, directL, bounces, nullptr, false,
+            Spectrum diffComp;
+            L += beta * UniformSampleOneLight(pi, scene, arena, sampler, directL, bounces, nullptr, diffComp, false,
                                               lightDistribution->Lookup(pi.p));
 
             // Account for the indirect subsurface scattering component

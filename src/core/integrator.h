@@ -69,15 +69,17 @@ class Integrator {
 Spectrum UniformSampleAllLights(const Interaction &it, const Scene &scene,
                                 MemoryArena &arena, Sampler &sampler,
                                 const std::vector<int> &nLightSamples,
+                                Spectrum& diffuse, Float roughnessThr,
                                 bool handleMedia = false);
 Spectrum UniformSampleOneLight(const Interaction &it, const Scene &scene,
                                MemoryArena &arena, Sampler &sampler, Spectrum& Li, int bounce,
-                               SampleBuffer* sampleBuffer, bool handleMedia = false,
+                               SampleBuffer* sampleBuffer, Spectrum& diffuse, Float roughnessThr, bool handleMedia = false,
                                const Distribution1D *lightDistrib = nullptr);
 Spectrum EstimateDirect(const Interaction &it, const Point2f &uShading,
                         const Light &light, const Point2f &uLight,
                         const Scene &scene, Sampler &sampler,
-                        MemoryArena &arena, Spectrum& directL, bool handleMedia = false,
+                        MemoryArena &arena, Spectrum& directL, Spectrum& diffuse,
+                        Float roughnessThreshold, bool handleMedia = false,
                         bool specular = false);
 std::unique_ptr<Distribution1D> ComputeLightPowerDistribution(
     const Scene &scene);
@@ -94,19 +96,21 @@ class SamplerIntegrator : public Integrator {
     void Render(const Scene &scene);
     virtual Spectrum Li(const RayDifferential &ray, const Scene &scene,
                         Sampler &sampler, MemoryArena &arena,
-                        int depth = 0, SampleBuffer* sampleBuffer = nullptr) const = 0;
+                        int depth = 0, SampleBuffer* sampleBuffer = nullptr,
+                        Spectrum* diffuse = nullptr) const = 0;
     Spectrum SpecularReflect(const RayDifferential &ray,
                              const SurfaceInteraction &isect,
                              const Scene &scene, Sampler &sampler,
-                             MemoryArena &arena, int depth) const;
+                             MemoryArena &arena, int depth, Spectrum &diffuse) const;
     Spectrum SpecularTransmit(const RayDifferential &ray,
                               const SurfaceInteraction &isect,
                               const Scene &scene, Sampler &sampler,
-                              MemoryArena &arena, int depth) const;
+                              MemoryArena &arena, int depth, Spectrum &diffuse) const;
 
   protected:
     // SamplerIntegrator Protected Data
     std::shared_ptr<const Camera> camera;
+    SampleLayout m_layout;
 
   private:
     void getSceneInfo(const Scene& scene, SceneInfo *info);
@@ -118,7 +122,6 @@ class SamplerIntegrator : public Integrator {
     // SamplerIntegrator Private Data
     std::shared_ptr<Sampler> sampler;
     const Bounds2i pixelBounds;
-    SampleLayout m_layout;
     std::unique_ptr<std::thread> m_thread;
 };
 

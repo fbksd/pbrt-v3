@@ -103,6 +103,8 @@ class HairBSDF : public BxDF {
     std::string ToString() const;
     static Spectrum SigmaAFromConcentration(Float ce, Float cp);
     static Spectrum SigmaAFromReflectance(const Spectrum &c, Float beta_n);
+    Float getRoughness() const
+    { return std::numeric_limits<Float>::infinity() ; }
 
   private:
     // HairBSDF Private Methods

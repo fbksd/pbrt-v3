@@ -180,11 +180,12 @@ class BSDF {
                  BxDFType flags = BSDF_ALL) const;
     Spectrum Sample_f(const Vector3f &wo, Vector3f *wi, const Point2f &u,
                       Float *pdf, BxDFType type = BSDF_ALL,
-                      BxDFType *sampledType = nullptr) const;
+                      BxDFType *sampledType = nullptr, Float* sampledRoughness = nullptr) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi,
               BxDFType flags = BSDF_ALL) const;
     std::string ToString() const;
     Spectrum getAlbedo() const;
+    Float getRoughness(BxDFType flags = BSDF_ALL) const;
 
     // BSDF Public Data
     const Float eta;
@@ -228,6 +229,8 @@ class BxDF {
     virtual Spectrum getAlbedo() const
     { return Spectrum(0.f); }
 
+    virtual Float getRoughness() const = 0;
+
     // BxDF Public Data
     const BxDFType type;
 };
@@ -258,6 +261,10 @@ class ScaledBxDF : public BxDF {
 
     Spectrum getAlbedo() const
     { return bxdf->getAlbedo() * scale; }
+
+    Float getRoughness() const
+    { return bxdf->getRoughness(); }
+
   private:
     BxDF *bxdf;
     Spectrum scale;
@@ -320,6 +327,8 @@ class SpecularReflection : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const { return 0; }
     std::string ToString() const;
+    Float getRoughness() const
+    { return 0.f; }
 
   private:
     // SpecularReflection Private Data
@@ -345,6 +354,8 @@ class SpecularTransmission : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const { return 0; }
     std::string ToString() const;
+    Float getRoughness() const
+    { return 0.f; }
 
   private:
     // SpecularTransmission Private Data
@@ -372,6 +383,8 @@ class FresnelSpecular : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const { return 0; }
     std::string ToString() const;
+    Float getRoughness() const
+    { return 0.f; }
 
   private:
     // FresnelSpecular Private Data
@@ -391,6 +404,8 @@ class LambertianReflection : public BxDF {
     std::string ToString() const;
     Spectrum getAlbedo() const
     { return R; }
+    Float getRoughness() const
+    { return std::numeric_limits<Float>::infinity(); }
 
   private:
     // LambertianReflection Private Data
@@ -409,6 +424,8 @@ class LambertianTransmission : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     std::string ToString() const;
+    Float getRoughness() const
+    { return std::numeric_limits<Float>::infinity(); }
 
   private:
     // LambertianTransmission Private Data
@@ -429,6 +446,8 @@ class OrenNayar : public BxDF {
     std::string ToString() const;
     Spectrum getAlbedo() const
     { return R; }
+    Float getRoughness() const
+    { return std::numeric_limits<Float>::infinity(); }
 
   private:
     // OrenNayar Private Data
@@ -452,6 +471,8 @@ class MicrofacetReflection : public BxDF {
     std::string ToString() const;
     Spectrum getAlbedo() const
     { return R; }
+    Float getRoughness() const
+    { return distribution->getRoughness(); }
 
   private:
     // MicrofacetReflection Private Data
@@ -478,6 +499,8 @@ class MicrofacetTransmission : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     std::string ToString() const;
+    Float getRoughness() const
+    { return distribution->getRoughness(); }
 
   private:
     // MicrofacetTransmission Private Data
@@ -504,6 +527,8 @@ class FresnelBlend : public BxDF {
     std::string ToString() const;
     virtual Spectrum getAlbedo() const
     { return Rd; }
+    Float getRoughness() const
+    { return distribution->getRoughness(); }
 
   private:
     // FresnelBlend Private Data
@@ -523,6 +548,8 @@ class FourierBSDF : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     std::string ToString() const;
+    Float getRoughness() const
+    { return 0.f; }
 
   private:
     // FourierBSDF Private Data

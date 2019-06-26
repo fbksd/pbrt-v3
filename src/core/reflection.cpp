@@ -702,7 +702,7 @@ Spectrum BSDF::rho(const Vector3f &wo, int nSamples, const Point2f *samples,
 
 Spectrum BSDF::Sample_f(const Vector3f &woWorld, Vector3f *wiWorld,
                         const Point2f &u, Float *pdf, BxDFType type,
-                        BxDFType *sampledType) const {
+                        BxDFType *sampledType, Float *sampledRoughness) const {
     ProfilePhase pp(Prof::BSDFSampling);
     // Choose which _BxDF_ to sample
     int matchingComps = NumComponents(type);
@@ -764,6 +764,8 @@ Spectrum BSDF::Sample_f(const Vector3f &woWorld, Vector3f *wiWorld,
     }
     VLOG(2) << "Overall f = " << f << ", pdf = " << *pdf << ", ratio = "
             << ((*pdf > 0) ? (f / *pdf) : Spectrum(0.));
+    if(sampledRoughness)
+        *sampledRoughness = bxdf->getRoughness();
     return f;
 }
 
@@ -798,6 +800,22 @@ Spectrum BSDF::getAlbedo() const
         if(bxdfs[i]->type & (BSDF_DIFFUSE | BSDF_GLOSSY))
             tex += bxdfs[i]->getAlbedo();
     return tex;
+}
+
+Float BSDF::getRoughness(BxDFType flags) const
+{
+    Float a = 0.f;
+    int n = 0;
+    for (int i = 0; i < nBxDFs; ++i)
+        if (bxdfs[i]->MatchesFlags(flags))
+        {
+            a += bxdfs[i]->getRoughness();
+            ++n;
+        }
+
+    if(n != 0)
+        return a/n;
+    return a;
 }
 
 }  // namespace pbrt

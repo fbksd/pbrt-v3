@@ -53,7 +53,9 @@ class AOIntegrator : public SamplerIntegrator {
                  std::shared_ptr<Sampler> sampler,
                  const Bounds2i &pixelBounds);
     Spectrum Li(const RayDifferential &ray, const Scene &scene,
-                Sampler &sampler, MemoryArena &arena, int depth, SampleBuffer* sampleBuffer = nullptr) const;
+                Sampler &sampler, MemoryArena &arena, int depth,
+                SampleBuffer* sampleBuffer = nullptr,
+                Spectrum *diffuse = nullptr) const;
  private:
     bool cosSample;
     int nSamples;

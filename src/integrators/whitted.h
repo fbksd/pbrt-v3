@@ -54,7 +54,9 @@ class WhittedIntegrator : public SamplerIntegrator {
                       const Bounds2i &pixelBounds)
         : SamplerIntegrator(camera, sampler, pixelBounds), maxDepth(maxDepth) {}
     Spectrum Li(const RayDifferential &ray, const Scene &scene,
-                Sampler &sampler, MemoryArena &arena, int depth, SampleBuffer* sampleBuffer = nullptr) const;
+                Sampler &sampler, MemoryArena &arena, int depth,
+                SampleBuffer* sampleBuffer = nullptr,
+                Spectrum* diffuse = nullptr) const;
 
   private:
     // WhittedIntegrator Private Data

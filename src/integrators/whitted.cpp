@@ -44,7 +44,7 @@ namespace pbrt {
 Spectrum WhittedIntegrator::Li(const RayDifferential &ray, const Scene &scene,
                                Sampler &sampler, MemoryArena &arena,
                                int depth,
-                               SampleBuffer* sampleBuffer) const {
+                               SampleBuffer* sampleBuffer, Spectrum* diffuse) const {
     Spectrum L(0.);
     // Find closest ray intersection or return background radiance
     SurfaceInteraction isect;
@@ -81,8 +81,11 @@ Spectrum WhittedIntegrator::Li(const RayDifferential &ray, const Scene &scene,
     }
     if (depth + 1 < maxDepth) {
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, isect, scene, sampler, arena, depth);
-        L += SpecularTransmit(ray, isect, scene, sampler, arena, depth);
+        Spectrum diffComp;
+        L += SpecularReflect(ray, isect, scene, sampler, arena, depth, diffComp);
+        *diffuse += diffComp;
+        L += SpecularTransmit(ray, isect, scene, sampler, arena, depth, diffComp);
+        *diffuse += diffComp;
     }
     return L;
 }

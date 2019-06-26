@@ -165,6 +165,9 @@ class SeparableBSSRDFAdapter : public BxDF {
     }
     std::string ToString() const { return "[ SeparableBSSRDFAdapter ]"; }
 
+    Float getRoughness() const
+    { return std::numeric_limits<Float>::infinity(); }
+
   private:
     const SeparableBSSRDF *bssrdf;
 };

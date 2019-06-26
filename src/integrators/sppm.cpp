@@ -195,12 +195,12 @@ void SPPMIntegrator::Render(const Scene &scene) {
                         // Accumulate direct illumination at SPPM camera ray
                         // intersection
                         Vector3f wo = -ray.d;
-                        Spectrum directL;
+                        Spectrum directL, diffComp;
                         if (depth == 0 || specularBounce)
                             pixel.Ld += beta * isect.Le(wo);
                         pixel.Ld +=
                             beta * UniformSampleOneLight(isect, scene, arena, *tileSampler,
-                                                         directL, 0, nullptr);
+                                                         directL, 0, nullptr, diffComp, 0.f);
 
                         // Possibly create visible point and end camera path
                         bool isDiffuse = bsdf.NumComponents(BxDFType(

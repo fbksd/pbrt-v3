@@ -97,6 +97,8 @@ class DisneyDiffuse : public BxDF {
     Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
     Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
+    Float getRoughness() const
+    { return std::numeric_limits<Float>::infinity(); }
 
   private:
     Spectrum R;
@@ -130,6 +132,8 @@ class DisneyFakeSS : public BxDF {
     Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
     Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
+    Float getRoughness() const
+    { return roughness; }
 
   private:
     Spectrum R;
@@ -172,6 +176,8 @@ class DisneyRetro : public BxDF {
     Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
     Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
+    Float getRoughness() const
+    { return roughness; }
 
   private:
     Spectrum R;
@@ -208,6 +214,8 @@ class DisneySheen : public BxDF {
     Spectrum rho(const Vector3f &, int, const Point2f *) const { return R; }
     Spectrum rho(int, const Point2f *, const Point2f *) const { return R; }
     std::string ToString() const;
+    Float getRoughness() const
+    { return std::numeric_limits<Float>::infinity(); }
 
   private:
     Spectrum R;
@@ -240,6 +248,8 @@ class DisneyClearcoat : public BxDF {
                       Float *pdf, BxDFType *sampledType) const;
     Float Pdf(const Vector3f &wo, const Vector3f &wi) const;
     std::string ToString() const;
+    Float getRoughness() const
+    { return 0.f; }
 
   private:
     Float weight, gloss;

@@ -55,7 +55,7 @@ void VolPathIntegrator::Preprocess(const Scene &scene, Sampler &sampler) {
 
 Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
                                Sampler &sampler, MemoryArena &arena,
-                               int depth, SampleBuffer* sampleBuffer) const {
+                               int depth, SampleBuffer* sampleBuffer, Spectrum* diffuse) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f), beta(1.f);
     RayDifferential ray(r);
@@ -116,7 +116,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             // Handle scattering at point in medium for volumetric path tracer
             const Distribution1D *lightDistrib =
                 lightDistribution->Lookup(mi.p);
-            L += beta * UniformSampleOneLight(mi, scene, arena, sampler, directL, bounces, sampleBuffer,
+            Spectrum diffComp;
+            L += beta * UniformSampleOneLight(mi, scene, arena, sampler, directL, bounces, sampleBuffer, diffComp,
                                               true, lightDistrib);
 
             Vector3f wo = -ray.d, wi;
@@ -177,7 +178,8 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
             // contribution
             const Distribution1D *lightDistrib =
                 lightDistribution->Lookup(isect.p);
-            L += beta * UniformSampleOneLight(isect, scene, arena, sampler, directL, bounces, sampleBuffer,
+            Spectrum diffComp;
+            L += beta * UniformSampleOneLight(isect, scene, arena, sampler, directL, bounces, sampleBuffer, diffComp,
                                               true, lightDistrib);
 
             if(bounces == 0)
@@ -241,8 +243,9 @@ Spectrum VolPathIntegrator::Li(const RayDifferential &r, const Scene &scene,
 
                 // Account for the attenuated direct subsurface scattering
                 // component
+                Spectrum diffComp;
                 L += beta *
-                     UniformSampleOneLight(pi, scene, arena, sampler, directL, 0, nullptr, true,
+                     UniformSampleOneLight(pi, scene, arena, sampler, directL, 0, nullptr, diffComp, true,
                                            lightDistribution->Lookup(pi.p));
 
                 // Account for the indirect subsurface scattering component

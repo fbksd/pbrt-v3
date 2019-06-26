@@ -64,7 +64,7 @@ void DirectLightingIntegrator::Preprocess(const Scene &scene,
 Spectrum DirectLightingIntegrator::Li(const RayDifferential &ray,
                                       const Scene &scene, Sampler &sampler,
                                       MemoryArena &arena, int depth,
-                                      SampleBuffer* sampleBuffer) const {
+                                      SampleBuffer* sampleBuffer, Spectrum *diffuse) const {
     ProfilePhase p(Prof::SamplerIntegratorLi);
     Spectrum L(0.f);
     // Find closest ray intersection or return background radiance
@@ -111,12 +111,15 @@ Spectrum DirectLightingIntegrator::Li(const RayDifferential &ray,
 
     Spectrum directL;
     if (scene.lights.size() > 0) {
+        Spectrum diffComp;
         // Compute direct lighting for _DirectLightingIntegrator_ integrator
         if (strategy == LightStrategy::UniformSampleAll)
             L += UniformSampleAllLights(isect, scene, arena, sampler,
-                                        nLightSamples);
+                                        nLightSamples, diffComp, m_layout.getRoughnessThreshold());
         else
-            L += UniformSampleOneLight(isect, scene, arena, sampler, directL, depth, sampleBuffer);
+            L += UniformSampleOneLight(isect, scene, arena, sampler, directL, depth, sampleBuffer,
+                                       diffComp, m_layout.getRoughnessThreshold());
+        *diffuse += diffComp;
     }
 
     if (depth == 0 && sampleBuffer) {
@@ -129,8 +132,11 @@ Spectrum DirectLightingIntegrator::Li(const RayDifferential &ray,
 
     if (depth + 1 < maxDepth) {
         // Trace rays for specular reflection and refraction
-        L += SpecularReflect(ray, isect, scene, sampler, arena, depth);
-        L += SpecularTransmit(ray, isect, scene, sampler, arena, depth);
+        Spectrum diffComp;
+        L += SpecularReflect(ray, isect, scene, sampler, arena, depth, diffComp);
+        *diffuse += diffComp;
+        L += SpecularTransmit(ray, isect, scene, sampler, arena, depth, diffComp);
+        *diffuse += diffComp;
     }
     return L;
 }
